@@ -58,7 +58,7 @@ export function useCurrentLocation() {
                 console.error('Unable to load data.', error);
             } finally {
                 setIsLoading(false);
-            }
+            } 
         }, [loadFunction]);
 
         useEffect(() => {
