@@ -1,67 +1,80 @@
 import polyline from '@mapbox/polyline';
 import { Route, Location, RoutePoint, UserPreferences, WeatherConditions, RouteGenerationOptions } from '@/utils';
-import { weatherService } from './WeatherService';
 import axios from 'axios';
-import { MAX_ATTEMPTS, BASE_SAFETY_SCORE } from '@/constants';
-const DIRECTIONS_BASE_URL = 'https://maps.googleapis.com/maps/api/directions/json';
+import { DIRECTIONS_BASE_URL, DIRECTIONS_TIMEOUT_MS } from '@/constants';
+
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 
 class RouteGenerationService {
+  private static successCount = 0;
+  private static totalAttempts = 0;
 
   async generateRoute(options: RouteGenerationOptions): Promise<Route | null> {
-    const { startLocation, distance, preferences, weatherConditions, roundTrip = true } = options;
+    RouteGenerationService.totalAttempts++;
+    console.time('Route Generation');
     
-    return await this.findValidRoute(startLocation, Math.round(distance), preferences, weatherConditions, roundTrip);
+    const { startLocation, distance, preferences, weatherConditions } = options;
+    const result = await this.tryGenerateRoute(startLocation, Math.round(distance), preferences, weatherConditions);
+    
+    if (result) {
+      RouteGenerationService.successCount++;
+    }
+    
+    console.timeEnd('Route Generation');
+    return result;
   }
 
-  // Factors that go into a route:
-  private async findValidRoute(
+  private async tryGenerateRoute(
     startLocation: Location,
     targetDistance: number,
     preferences: UserPreferences,
-    weatherConditions: WeatherConditions,
-    roundTrip: boolean
+    weatherConditions: WeatherConditions
   ): Promise<Route | null> {
-
-    const travelMode = 'walking'; // Use the walking setting for Google Maps
-    
-    // Try up to 15 times for a route
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-
-      const randomPin = this.generateRandomPin(startLocation, targetDistance); // within the specified distance
-      const routeData = await this.getRouteFromGoogleMaps(startLocation, randomPin, travelMode);
-      
-      if (routeData && this.isValidRoute(routeData, targetDistance)) {
-        return this.createRoute(routeData, startLocation, preferences, weatherConditions, roundTrip);
+    // Try minimal scales for faster success while keeping <= target
+    const distanceScales = [0.75, 0.65];
+    for (const scale of distanceScales) {
+      for (let i = 0; i < 1; i++) {
+        try {
+          const destination = this.generateDestinationWithScale(startLocation, targetDistance, scale);
+          const routeData = await this.getRouteFromGoogleMaps(startLocation, destination);
+          if (routeData && this.isValidRoute(routeData, targetDistance)) {
+            return this.createRoute(routeData, startLocation, preferences, weatherConditions);
+          }
+        } catch (error) {
+          console.error('Route generation attempt failed:', error);
+        }
       }
     }
-  
     return null;
+  }
+
+  private generateDestinationWithScale(startLocation: Location, targetDistance: number, scale: number): Location {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = targetDistance * scale;
+    const latOffset = (distance / 111000) * Math.cos(angle);
+    const lngOffset = (distance / 111000) * Math.sin(angle) / Math.cos(startLocation.latitude * Math.PI / 180);
+    return { latitude: startLocation.latitude + latOffset, longitude: startLocation.longitude + lngOffset };
   }
 
   private isValidRoute(routeData: any, targetDistance: number): boolean {
     if (!routeData?.points || routeData.points.length < 2) return false;
-    return this.calculateTotalDistance(routeData.points) <= targetDistance;
+    const actualDistance = this.calculateTotalDistance(routeData.points);
+    // Routes must be at or under the target distance
+    return actualDistance <= targetDistance && actualDistance > 0;
   }
 
   private createRoute(
     routeData: { points: RoutePoint[], duration: number },
     startLocation: Location,
     preferences: UserPreferences,
-    weatherConditions: WeatherConditions,
-    roundTrip: boolean
+    weatherConditions: WeatherConditions
   ): Route {
     const totalDistance = this.calculateTotalDistance(routeData.points);
     const endLocation = routeData.points[routeData.points.length - 1];
 
-    // Calculate factors that go into a route
-    const difficulty = this.calculateDifficulty(totalDistance, weatherConditions, preferences);
-    const safetyScore = this.calculateSafetyScore(routeData.points, weatherConditions, preferences);
-    const weatherNotes = weatherService.getWeatherRecommendations(weatherConditions);
-
     return {
       id: this.generateRouteId(),
-      name: this.generateRouteName(totalDistance, weatherConditions, preferences),
+      name: this.generateRouteName(totalDistance, weatherConditions, preferences.units || 'metric'),
       distance: totalDistance,
       duration: routeData.duration,
       points: routeData.points,
@@ -69,98 +82,57 @@ class RouteGenerationService {
       endLocation,
       weatherConditions,
       createdAt: new Date(),
-      isLoop: roundTrip,
-      difficulty,
-      safetyScore,
-      weatherNotes,
+      difficulty: this.calculateSimpleDifficulty(totalDistance),
+      safetyScore: this.calculateSimpleSafetyScore(totalDistance, weatherConditions),
     };
   }
 
-  private calculateDestinationPoint(start: Location, bearing: number, distance: number): Location {
-    const EARTH_RADIUS = 6371000; // Earth's radius in meters
-    const angularDistance = distance / EARTH_RADIUS;
-    
-    const startLatRad = this.degreesToRadians(start.latitude);
-    const startLonRad = this.degreesToRadians(start.longitude);
-    
-    const destLatRad = this.calculateDestinationLatitude(startLatRad, angularDistance, bearing);
-    const destLonRad = this.calculateDestinationLongitude(startLatRad, startLonRad, destLatRad, angularDistance, bearing);
-    
-    const result = {
-      latitude: this.radiansToDegrees(destLatRad),
-      longitude: this.radiansToDegrees(destLonRad),
-    };
-
-    return this.validateCoordinates(result, start);
+  private calculateSimpleDifficulty(distance: number): 'easy' | 'moderate' | 'hard' {
+    const km = distance / 1000;
+    if (km < 2) return 'easy';
+    if (km < 5) return 'moderate';
+    return 'hard';
   }
 
-  private degreesToRadians(degrees: number): number {
-    return degrees * Math.PI / 180;
+  private calculateSimpleSafetyScore(distance: number, weather: WeatherConditions): number {
+    let score = 85; // Base score
+    if (weather.precipitation > 10) score -= 20;
+    else if (weather.precipitation > 2) score -= 10;
+    if (weather.windSpeed > 25) score -= 15;
+    else if (weather.windSpeed > 15) score -= 5;
+    if (weather.temperature < 0 || weather.temperature > 35) score -= 10;
+    if (distance > 5000) score -= 10;
+    return Math.max(0, Math.min(100, score));
   }
 
-  private radiansToDegrees(radians: number): number {
-    return radians * 180 / Math.PI;
-  }
-
-  private calculateDestinationLatitude(startLatRad: number, angularDistance: number, bearing: number): number {
-    return Math.asin(
-      Math.sin(startLatRad) * Math.cos(angularDistance) + 
-      Math.cos(startLatRad) * Math.sin(angularDistance) * Math.cos(bearing)
-    );
-  }
-
-  private calculateDestinationLongitude(
-    startLatRad: number, 
-    startLonRad: number, 
-    destLatRad: number, 
-    angularDistance: number, 
-    bearing: number
-  ): number {
-    return startLonRad + Math.atan2(
-      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(startLatRad),
-      Math.cos(angularDistance) - Math.sin(startLatRad) * Math.sin(destLatRad)
-    );
-  }
-
-  // return fallback if invalid
-  private validateCoordinates(result: Location, start: Location): Location {
-    const isValid = isFinite(result.latitude) && isFinite(result.longitude) &&
-                   result.latitude >= -90 && result.latitude <= 90 &&
-                   result.longitude >= -180 && result.longitude <= 180;
-
-    if (isValid) {
-      return result;
-    }
-
-    console.warn('Invalid coordinates generated, using fallback');
-    return {
-      latitude: start.latitude + (Math.random() - 0.5) * 0.001,
-      longitude: start.longitude + (Math.random() - 0.5) * 0.001,
-    };
-  }
-
-
-  // Polyline (from Mapbox library the goat)for storing lat/lng points as a single string
-  private decodePolyline(encoded: string): number[] {
-    return polyline.decode(encoded).flat();
-  }
+  
 
   private async getRouteFromGoogleMaps(
     origin: Location,
-    destination: Location,
-    mode: 'walking'
+    destination: Location
   ): Promise<{ points: RoutePoint[], duration: number } | null> {
-   
-    // API request
+    console.time('Google Maps API');
+    
     try {
-      const response = await axios.get(DIRECTIONS_BASE_URL, {
-        params: {
-          origin: `${origin.latitude},${origin.longitude}`,
-          destination: `${destination.latitude},${destination.longitude}`,
-          mode,
-          key: GOOGLE_MAPS_API_KEY,
-        }
-      });
+      if (!GOOGLE_MAPS_API_KEY) {
+        console.error('Google Maps API key is missing!');
+        return null;
+      }
+      
+      // Add timeout to prevent hanging
+      const response = await Promise.race([
+        axios.get(DIRECTIONS_BASE_URL, {
+          params: {
+            origin: `${origin.latitude},${origin.longitude}`,
+            destination: `${destination.latitude},${destination.longitude}`,
+            mode: 'walking',
+            key: GOOGLE_MAPS_API_KEY,
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API timeout')), DIRECTIONS_TIMEOUT_MS)
+        )
+      ]) as any;
       
       const route = response.data.routes?.[0];
       if (!route) {
@@ -168,40 +140,43 @@ class RouteGenerationService {
       }
       
       const points = this.decodeRoutePoints(route.overview_polyline?.points);
-      const duration = this.calculateRouteDuration(route.legs);
+      const duration = route.legs.reduce((total: number, leg: any) => total + leg.duration.value, 0);
       
+      console.timeEnd('Google Maps API');
       return { points, duration };
     } catch (error) {
-      // API call failed
+      console.timeEnd('Google Maps API');
       console.error('Google Maps API error:', error);
       return null;
     }
   }
 
-  // Convert polyline string to RoutePoint array
   private decodeRoutePoints(polylineString: string): RoutePoint[] {
     if (!polylineString) return [];
-    
-    const points: RoutePoint[] = [];
-    const decoded = this.decodePolyline(polylineString);
-    let timestamp = Date.now();
-    
-    // Process coordinates in pairs (latitude, longitude)
-    for (let i = 0; i + 1 < decoded.length; i += 2) {
-      const lat = decoded[i];
-      const lng = decoded[i + 1];
-      
-      if (this.isValidCoordinate(lat, lng)) {
-        points.push({ latitude: lat, longitude: lng, timestamp });
-        timestamp += 1000; // add 1 second between each point
-      }
-    }
-    
-    return points;
+    const decoded = polyline.decode(polylineString);
+    return decoded
+      .map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
+      .filter(p => this.isValidCoordinate(p.latitude, p.longitude));
   }
 
-  private calculateRouteDuration(legs: any[]): number {
-    return legs.reduce((total, leg) => total + leg.duration.value, 0);
+  private calculateTotalDistance(points: RoutePoint[]): number {
+    return points.slice(1).reduce((total, point, i) => 
+      total + this.calculateDistance(points[i], point), 0
+    );
+  }
+
+  private calculateDistance(point1: RoutePoint, point2: RoutePoint): number {
+    const R = 6371000; // Earth's radius in meters
+    const lat1Rad = point1.latitude * Math.PI / 180;
+    const lat2Rad = point2.latitude * Math.PI / 180;
+    const deltaLatRad = (point2.latitude - point1.latitude) * Math.PI / 180;
+    const deltaLonRad = (point2.longitude - point1.longitude) * Math.PI / 180;
+
+    const a = Math.sin(deltaLatRad / 2) ** 2 + 
+              Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLonRad / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   }
 
   private isValidCoordinate(lat: number, lng: number): boolean {
@@ -210,110 +185,28 @@ class RouteGenerationService {
            lng >= -180 && lng <= 180;
   }
 
-  // within the target distance
-  private generateRandomPin(startLocation: Location, targetDistance: number): Location {
-    const angle = Math.random() * Math.PI * 2; // Random direction
-    const pinDistance = targetDistance * (0.6 + Math.random() * 0.2); // We don't want it to be exactly the target distance, so 60-80% of target
-    return this.calculateDestinationPoint(startLocation, angle, pinDistance);
-  }
+  private generateRouteName(distance: number, weather: WeatherConditions, units: 'metric' | 'imperial'): string {
+    // Minimal: choose icon by clear/cloudy based on weatherCode range
+    const weatherIcon = weather.weatherCode >= 800 ? '☀️' : '🌧️';
 
-  // Sum distances between consecutive points
-  private calculateTotalDistance(points: RoutePoint[]): number {
-    return points.slice(1).reduce((total, point, i) => 
-      total + this.calculateDistance(points[i], point), 0
-    );
-  }
-
-  private calculateDistance(point1: RoutePoint, point2: RoutePoint): number {
-    const EARTH_RADIUS = 6371000; 
-    
-    const lat1Rad = this.degreesToRadians(point1.latitude);
-    const lat2Rad = this.degreesToRadians(point2.latitude);
-    const deltaLatRad = this.degreesToRadians(point2.latitude - point1.latitude);
-    const deltaLonRad = this.degreesToRadians(point2.longitude - point1.longitude);
-
-    // Haversine formula
-    const a = Math.sin(deltaLatRad / 2) ** 2 + 
-              Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLonRad / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return EARTH_RADIUS * c;
-  }
-
-  // Calculate route difficulty based on distance and weather
-  private calculateDifficulty(distance: number, weather: WeatherConditions, preferences: UserPreferences): 'easy' | 'moderate' | 'hard' {
-    // Get how weather affects the route
-    const weatherImpact = weatherService.getWeatherImpactOnRoute(weather, preferences.weatherSensitivity);
-    
-    // adjust distance based on weather
-    const adjustedDistance = distance * weatherImpact.distanceMultiplier;
-    
-    // use distance in km + weather to calculate difficulty
-    const difficultyScore = adjustedDistance / 1000 + weatherImpact.difficultyAdjustment;
-
-    if (difficultyScore < 2) return 'easy';
-    if (difficultyScore < 4) return 'moderate';
-    return 'hard';
-  }
-
-  private calculateSafetyScore(points: RoutePoint[], weather: WeatherConditions, preferences: UserPreferences): number {
-    let score = BASE_SAFETY_SCORE;
-
-    const weatherImpact = weatherService.getWeatherImpactOnRoute(weather, preferences.weatherSensitivity);
-    score += weatherImpact.safetyAdjustment;
-    score += this.getRouteLengthSafetyPenalty(points.length);
-    score += this.getTimeOfDaySafetyPenalty();
-    score += this.getWeatherCodeSafetyPenalty(weather.weatherCode);
-
-    return Math.max(0, Math.min(100, score));
-  }
-
-  private getRouteLengthSafetyPenalty(pointCount: number): number {
-    if (pointCount > 100) return 20; // very long route
-    if (pointCount > 50) return 10;  // long route
-    return 0; // short route
-  }
-
-  private getTimeOfDaySafetyPenalty(): number {
-    const hour = new Date().getHours();
-    if (hour < 6 || hour > 22) return 10; // very late/early
-    if (hour < 8 || hour > 20) return 5;  // late/early
-    return 0; // daytime
-  }
-
-  private getWeatherCodeSafetyPenalty(weatherCode: number): number {
-    if (weatherCode >= 200 && weatherCode < 300) return -20; // thunderstorms
-    if (weatherCode >= 600 && weatherCode < 700) return -8;  // snow
-    return 0;
-  }
-
-  private generateRouteName(distance: number, weather: WeatherConditions, preferences: UserPreferences): string {
-    const weatherIcon = weatherService.getWeatherIcon(weather.weatherCode);
-    const timeOfDay = this.getTimeOfDay();
-    const randomAdjective = this.getRandomAdjective();
-    
-    return `${weatherIcon} ${randomAdjective} ${timeOfDay} Walk`;
-  }
-
-  private getRandomAdjective(): string {
-    const adjectives = ['Scenic', 'Peaceful', 'Adventure', 'Discovery', 'Explorer', 'Wanderer'];
-    return adjectives[Math.floor(Math.random() * adjectives.length)];
-  }
-
-  private getTimeOfDay(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    if (hour < 20) return 'Evening';
-    return 'Night';
+    if (units === 'imperial') {
+      const miles = Math.round((distance / 1000) * 0.621371 * 10) / 10;
+      return `${weatherIcon} ${miles}mi Walk`;
+    } else {
+      const km = Math.round(distance / 1000 * 10) / 10;
+      return `${weatherIcon} ${km}km Walk`;
+    }
   }
 
   private generateRouteId(): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 11);
-    return `route_${timestamp}_${random}`;
+    return `route_${Date.now()}`;
   }
 
+  static getSuccessRate(): number {
+    return RouteGenerationService.totalAttempts > 0 
+      ? (RouteGenerationService.successCount / RouteGenerationService.totalAttempts) * 100 
+      : 0;
+  }
 }
 
 export const routeGenerationService = new RouteGenerationService();
