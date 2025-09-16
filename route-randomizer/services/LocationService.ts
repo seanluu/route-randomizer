@@ -1,24 +1,25 @@
-import * as Location from 'expo-location'; // shout out Expo dawg
+import * as Location from 'expo-location';
 import { Location as LocationType } from '@/utils';
 import { MILES_TO_METERS, KM_TO_METERS } from '@/constants';
 
 class LocationService {
-
-  // Grab user's last known location for fallback info if we can't get current one
+  // Cache the last known location for fallback
   private lastKnownLocation: LocationType | null = null;
 
-  // Request location perms
+  
+  // Request location permissions from the user
   async requestPermissions(): Promise<boolean> {
+    // try catch is basically second to if else (handles errors) after them
     try {
       const result = await Location.requestForegroundPermissionsAsync();
-      return result.status === 'granted'; // this is included in the Expo framework so we don't have to make it ourselves
+      return result.status === 'granted';
     } catch (error) {
       console.error('Error requesting location permissions:', error);
       return false;
     }
   }
 
-  // Check if perms are enabled
+  // Check if location permissions are already granted
   async checkPermissions(): Promise<boolean> {
     try {
       const result = await Location.getForegroundPermissionsAsync();
@@ -29,23 +30,26 @@ class LocationService {
     }
   }
 
+  // Get the user's current location
   async getCurrentLocation(): Promise<LocationType | null> {
-    // Check if we have perms, if we don't then request perms again
+    // Check if we have permission first
     const hasPermission = await this.checkPermissions();
     if (!hasPermission) {
+      // Try to request permission
       const granted = await this.requestPermissions();
       if (!granted) {
-        console.warn('Location permissions denied.');
+        console.error('Location permission denied');
+        // Fall back to last known location
         const lastKnown = await this.getLastKnownLocation();
         return lastKnown;
       }
     }
 
-    // Worst case scenario just grab current location
+    // Try to get current location
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 2000, // wait 2 seconds for location
+        timeInterval: 2000, // Wait up to 2 seconds for location
         distanceInterval: 10,
       });
 
@@ -54,29 +58,33 @@ class LocationService {
         longitude: location.coords.longitude,
       };
 
-      // Remember this location for later use by caching
-      this.lastKnownLocation = currentLocation; // update last known location
+      // Cache this location for future use
+      this.lastKnownLocation = currentLocation;
       return currentLocation;
     } catch (error) {
       console.error('Error getting current location:', error);
-
-      // If we can't get current location, return last known location
+      
+      // If current location fails, try last known location
       const lastKnown = await this.getLastKnownLocation();
       if (lastKnown) {
-        return lastKnown
+        return lastKnown;
       }
+      
       return null;
     }
   }
 
+  // Get the last known location (cached or from device)
   async getLastKnownLocation(): Promise<LocationType | null> {
-    if (this.lastKnownLocation) { // cached location if it's available
+    // Return cached location if available
+    if (this.lastKnownLocation) {
       return this.lastKnownLocation;
     }
 
-    // Otherwise, try very very hard to get the last known location from device
     try {
-      const location = await Location.getLastKnownPositionAsync();
+      // Try to get last known position from device
+      const location = await Location.getLastKnownPositionAsync({});
+      
       if (location) {
         this.lastKnownLocation = {
           latitude: location.coords.latitude,
@@ -86,34 +94,32 @@ class LocationService {
       } else {
         return null;
       }
-
-   } catch (error) {
+    } catch (error) {
       console.error('Error getting last known location:', error);
       return null;
     }
   }
 
+  // Format distance in meters to a readable string
   formatDistance(distance: number, units: 'metric' | 'imperial' = 'metric'): string {
-    
-    // if user selects miles, then we use imperial system
-    if (units === 'imperial') { 
+    if (units === 'imperial') {
       const miles = distance / MILES_TO_METERS;
       return `${miles.toFixed(1)} mi`;
     }
-
-    // otherwise use km (metric system)
-    const kilometers = distance / KM_TO_METERS;
-    return `${kilometers.toFixed(1)} km`;
+    // Always show kilometers for metric units, even for short distances
+    const km = distance / KM_TO_METERS;
+    return `${km.toFixed(1)} km`;
   }
 
+  // Format duration in seconds to a readable string
   formatDuration(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-
+    
     if (hours > 0) {
-      return `${hours} hr ${minutes} min`;
+      return `${hours}h ${minutes}m`;
     } else {
-      return `${minutes} min`;
+      return `${minutes}m`;
     }
   }
 }

@@ -8,6 +8,7 @@ export const DEFAULT_LATITUDE_DELTA = 0.01;
 export const DEFAULT_LONGITUDE_DELTA = 0.01;
 
 // Route generation
+export const DIRECTIONS_BASE_URL = 'https://maps.googleapis.com/maps/api/directions/json';
 export const MAX_ATTEMPTS = 15;
 export const BASE_SAFETY_SCORE = 85;
 

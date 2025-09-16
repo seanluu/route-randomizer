@@ -15,14 +15,6 @@ export const lightShadow = {
   shadowRadius: 2,
 } as const;
 
-export const heavyShadow = {
-  elevation: 4,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.15,
-  shadowRadius: 8,
-} as const;
-
 // Card patterns
 export const commonCard = {
   margin: 20,
@@ -56,20 +48,17 @@ export const commonButton = {
   borderRadius: 8,
 };
 
+// Use inside LinearGradient wrappers to ensure consistent padding/alignment
+export const gradientButton = {
+  ...commonButton,
+};
+
 export const iconButton = {
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
   borderRadius: 12,
   borderWidth: 2,
   borderColor: 'transparent',
-};
-
-export const circularButton = {
-  alignItems: 'center' as const,
-  justifyContent: 'center' as const,
-  borderRadius: 20,
-  borderWidth: 1,
-  borderColor: '#e9ecef',
 };
 
 // Text patterns
