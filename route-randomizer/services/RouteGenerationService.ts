@@ -6,22 +6,9 @@ import { DIRECTIONS_BASE_URL, DIRECTIONS_TIMEOUT_MS } from '@/constants';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 
 class RouteGenerationService {
-  private static successCount = 0;
-  private static totalAttempts = 0;
-
   async generateRoute(options: RouteGenerationOptions): Promise<Route | null> {
-    RouteGenerationService.totalAttempts++;
-    console.time('Route Generation');
-    
     const { startLocation, distance, preferences, weatherConditions } = options;
-    const result = await this.tryGenerateRoute(startLocation, Math.round(distance), preferences, weatherConditions);
-    
-    if (result) {
-      RouteGenerationService.successCount++;
-    }
-    
-    console.timeEnd('Route Generation');
-    return result;
+    return await this.tryGenerateRoute(startLocation, Math.round(distance), preferences, weatherConditions);
   }
 
   private async tryGenerateRoute(
@@ -33,16 +20,14 @@ class RouteGenerationService {
     // Try minimal scales for faster success while keeping <= target
     const distanceScales = [0.75, 0.65];
     for (const scale of distanceScales) {
-      for (let i = 0; i < 1; i++) {
-        try {
-          const destination = this.generateDestinationWithScale(startLocation, targetDistance, scale);
-          const routeData = await this.getRouteFromGoogleMaps(startLocation, destination);
-          if (routeData && this.isValidRoute(routeData, targetDistance)) {
-            return this.createRoute(routeData, startLocation, preferences, weatherConditions);
-          }
-        } catch (error) {
-          console.error('Route generation attempt failed:', error);
+      try {
+        const destination = this.generateDestinationWithScale(startLocation, targetDistance, scale);
+        const routeData = await this.getRouteFromGoogleMaps(startLocation, destination);
+        if (routeData && this.isValidRoute(routeData, targetDistance)) {
+          return this.createRoute(routeData, startLocation, preferences, weatherConditions);
         }
+      } catch (error) {
+        console.error('Route generation attempt failed:', error);
       }
     }
     return null;
@@ -105,34 +90,26 @@ class RouteGenerationService {
     return Math.max(0, Math.min(100, score));
   }
 
-  
-
   private async getRouteFromGoogleMaps(
     origin: Location,
     destination: Location
   ): Promise<{ points: RoutePoint[], duration: number } | null> {
-    console.time('Google Maps API');
-    
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn('Google Maps API key is missing, cannot generate routes');
+      return null;
+    }
+
     try {
-      if (!GOOGLE_MAPS_API_KEY) {
-        console.error('Google Maps API key is missing!');
-        return null;
-      }
       
-      // Add timeout to prevent hanging
-      const response = await Promise.race([
-        axios.get(DIRECTIONS_BASE_URL, {
-          params: {
-            origin: `${origin.latitude},${origin.longitude}`,
-            destination: `${destination.latitude},${destination.longitude}`,
-            mode: 'walking',
-            key: GOOGLE_MAPS_API_KEY,
-          }
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('API timeout')), DIRECTIONS_TIMEOUT_MS)
-        )
-      ]) as any;
+      const response = await axios.get(DIRECTIONS_BASE_URL, {
+        params: {
+          origin: `${origin.latitude},${origin.longitude}`,
+          destination: `${destination.latitude},${destination.longitude}`,
+          mode: 'walking',
+          key: GOOGLE_MAPS_API_KEY,
+        },
+        timeout: DIRECTIONS_TIMEOUT_MS
+      });
       
       const route = response.data.routes?.[0];
       if (!route) {
@@ -142,10 +119,8 @@ class RouteGenerationService {
       const points = this.decodeRoutePoints(route.overview_polyline?.points);
       const duration = route.legs.reduce((total: number, leg: any) => total + leg.duration.value, 0);
       
-      console.timeEnd('Google Maps API');
       return { points, duration };
     } catch (error) {
-      console.timeEnd('Google Maps API');
       console.error('Google Maps API error:', error);
       return null;
     }
@@ -186,9 +161,9 @@ class RouteGenerationService {
   }
 
   private generateRouteName(distance: number, weather: WeatherConditions, units: 'metric' | 'imperial'): string {
-    // Minimal: choose icon by clear/cloudy based on weatherCode range
+    // Simple weather icon based on weather code
     const weatherIcon = weather.weatherCode >= 800 ? '☀️' : '🌧️';
-
+    
     if (units === 'imperial') {
       const miles = Math.round((distance / 1000) * 0.621371 * 10) / 10;
       return `${weatherIcon} ${miles}mi Walk`;
@@ -202,11 +177,6 @@ class RouteGenerationService {
     return `route_${Date.now()}`;
   }
 
-  static getSuccessRate(): number {
-    return RouteGenerationService.totalAttempts > 0 
-      ? (RouteGenerationService.successCount / RouteGenerationService.totalAttempts) * 100 
-      : 0;
-  }
 }
 
 export const routeGenerationService = new RouteGenerationService();

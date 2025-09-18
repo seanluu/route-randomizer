@@ -14,7 +14,7 @@ class LocationService {
       const result = await Location.requestForegroundPermissionsAsync();
       return result.status === 'granted';
     } catch (error) {
-      console.error('Error requesting location permissions:', error);
+      console.error('Failed to request location permissions:', error);
       return false;
     }
   }
@@ -25,31 +25,25 @@ class LocationService {
       const result = await Location.getForegroundPermissionsAsync();
       return result.status === 'granted';
     } catch (error) {
-      console.error('Error checking location permissions:', error);
+      console.error('Failed to check location permissions:', error);
       return false;
     }
   }
 
   // Get the user's current location
   async getCurrentLocation(): Promise<LocationType | null> {
-    // Check if we have permission first
     const hasPermission = await this.checkPermissions();
     if (!hasPermission) {
-      // Try to request permission
       const granted = await this.requestPermissions();
       if (!granted) {
-        console.error('Location permission denied');
-        // Fall back to last known location
-        const lastKnown = await this.getLastKnownLocation();
-        return lastKnown;
+        return await this.getLastKnownLocation();
       }
     }
 
-    // Try to get current location
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 2000, // Wait up to 2 seconds for location
+        timeInterval: 2000,
         distanceInterval: 10,
       });
 
@@ -58,44 +52,32 @@ class LocationService {
         longitude: location.coords.longitude,
       };
 
-      // Cache this location for future use
       this.lastKnownLocation = currentLocation;
       return currentLocation;
     } catch (error) {
-      console.error('Error getting current location:', error);
-      
-      // If current location fails, try last known location
-      const lastKnown = await this.getLastKnownLocation();
-      if (lastKnown) {
-        return lastKnown;
-      }
-      
-      return null;
+      console.error('Failed to get current location:', error);
+      return await this.getLastKnownLocation();
     }
   }
 
   // Get the last known location (cached or from device)
   async getLastKnownLocation(): Promise<LocationType | null> {
-    // Return cached location if available
     if (this.lastKnownLocation) {
       return this.lastKnownLocation;
     }
 
     try {
-      // Try to get last known position from device
       const location = await Location.getLastKnownPositionAsync({});
-      
       if (location) {
         this.lastKnownLocation = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         };
         return this.lastKnownLocation;
-      } else {
-        return null;
       }
+      return null;
     } catch (error) {
-      console.error('Error getting last known location:', error);
+      console.error('Failed to get last known location:', error);
       return null;
     }
   }

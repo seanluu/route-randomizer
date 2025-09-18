@@ -5,143 +5,88 @@ class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
 
   async init(): Promise<void> {
-    this.db = await SQLite.openDatabaseAsync('route_randomizer.db');
-    await this.createTables();
-    await this.migrateSchemaIfNeeded();
+    try {
+      this.db = await SQLite.openDatabaseAsync('route_randomizer.db');
+      await this.createTables();
+      await this.migrateSchemaIfNeeded();
+    } catch (error) {
+      console.error('Database initialization failed:', error);
+      throw error;
+    }
   }
 
   private async createTables(): Promise<void> {
     if (!this.db) return;
 
     try {
-      // Simple routes table
+      // Super simple tables for personal use
       await this.db.execAsync(`
         CREATE TABLE IF NOT EXISTS routes (
           id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          distance REAL NOT NULL,
-          duration REAL NOT NULL,
-          points TEXT NOT NULL,
-          start_latitude REAL NOT NULL,
-          start_longitude REAL NOT NULL,
-          end_latitude REAL NOT NULL,
-          end_longitude REAL NOT NULL,
-          weather_conditions TEXT NOT NULL,
-          created_at TEXT NOT NULL,
+          name TEXT,
+          distance REAL,
+          duration REAL,
+          points TEXT,
+          start_location TEXT,
+          end_location TEXT,
+          weather TEXT,
+          created_at TEXT,
           walked_at TEXT,
-          difficulty TEXT NOT NULL,
-          safety_score INTEGER NOT NULL
+          difficulty TEXT,
+          safety_score INTEGER
         );
       `);
 
-      // Simple preferences table
       await this.db.execAsync(`
-        CREATE TABLE IF NOT EXISTS user_preferences (
-          id INTEGER PRIMARY KEY DEFAULT 1,
-          units TEXT DEFAULT 'metric',
-          temperature_units TEXT DEFAULT 'celsius',
-          updated_at TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS preferences (
+          key TEXT PRIMARY KEY,
+          value TEXT
         );
       `);
-
-      // Initialize default preferences
-      await this.initializeDefaultPreferences();
     } catch (error) {
-      console.error('Error creating tables:', error);
+      console.error('Error creating database tables:', error);
       throw error;
     }
   }
 
-  // Drop unused columns (is_loop, weather_notes) if they exist
+  // Simple migration - handle schema changes
   private async migrateSchemaIfNeeded(): Promise<void> {
     if (!this.db) return;
+    
     try {
-      const info = await this.db.getAllAsync(`PRAGMA table_info(routes)`);
-      const columns = (info as any[]).map(c => c.name as string);
-      const hasIsLoop = columns.includes('is_loop');
-      const hasWeatherNotes = columns.includes('weather_notes');
-      if (!hasIsLoop && !hasWeatherNotes) return;
-
-      await this.db.execAsync('BEGIN TRANSACTION');
-      // Create new table without unused columns
-      await this.db.execAsync(`
-        CREATE TABLE IF NOT EXISTS routes_new (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          distance REAL NOT NULL,
-          duration REAL NOT NULL,
-          points TEXT NOT NULL,
-          start_latitude REAL NOT NULL,
-          start_longitude REAL NOT NULL,
-          end_latitude REAL NOT NULL,
-          end_longitude REAL NOT NULL,
-          weather_conditions TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          walked_at TEXT,
-          difficulty TEXT NOT NULL,
-          safety_score INTEGER NOT NULL
-        );
-      `);
-
-      // Copy data across selecting only the kept columns
-      await this.db.execAsync(`
-        INSERT INTO routes_new (
-          id, name, distance, duration, points, start_latitude, start_longitude,
-          end_latitude, end_longitude, weather_conditions, created_at, walked_at,
-          difficulty, safety_score
-        )
-        SELECT 
-          id, name, distance, duration, points, start_latitude, start_longitude,
-          end_latitude, end_longitude, weather_conditions, created_at, walked_at,
-          difficulty, safety_score
-        FROM routes;
-      `);
-
-      await this.db.execAsync('DROP TABLE routes');
-      await this.db.execAsync('ALTER TABLE routes_new RENAME TO routes');
-      await this.db.execAsync('COMMIT');
+      // Check if start_location column exists
+      const tableInfo = await this.db.getAllAsync("PRAGMA table_info(routes)");
+      const hasStartLocation = tableInfo.some((col: any) => col.name === 'start_location');
+      
+      if (!hasStartLocation) {
+        await this.db.execAsync(`
+          ALTER TABLE routes ADD COLUMN start_location TEXT DEFAULT '{"latitude":0,"longitude":0}';
+          ALTER TABLE routes ADD COLUMN end_location TEXT DEFAULT '{"latitude":0,"longitude":0}';
+        `);
+      }
     } catch (error) {
-      await this.db!.execAsync('ROLLBACK');
-      console.error('Schema migration failed:', error);
+      console.error('Migration failed, recreating tables:', error);
+      // If migration fails, drop and recreate tables
+      await this.db.execAsync('DROP TABLE IF EXISTS routes');
+      await this.createTables();
     }
   }
 
-  private async initializeDefaultPreferences(): Promise<void> {
-    const preferences = await this.getUserPreferences();
-    if (preferences) return; // Already have preferences
-    
-    const defaultPreferences: UserPreferences = {
-      preferredDuration: 30,
-      avoidHighways: true,
-      preferShadedRoutes: true,
-      preferQuietStreets: true,
-      weatherSensitivity: 'medium',
-      units: 'metric',
-      temperatureUnits: 'celsius',
-    };
-    await this.saveUserPreferences(defaultPreferences);
-  }
-
-  // Basic route operations
+  // Super simple route operations
   async saveRoute(route: Route): Promise<void> {
     if (!this.db) return;
 
-    const pointsJson = JSON.stringify(route.points);
-    const weatherJson = JSON.stringify(route.weatherConditions);
-
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO routes (
-        id, name, distance, duration, points, start_latitude, start_longitude,
-        end_latitude, end_longitude, weather_conditions, created_at, walked_at,
-        difficulty, safety_score
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO routes (id, name, distance, duration, points, start_location, end_location, weather, created_at, walked_at, difficulty, safety_score) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        route.id, route.name, route.distance, route.duration, pointsJson,
-        route.startLocation.latitude, route.startLocation.longitude,
-        route.endLocation.latitude, route.endLocation.longitude,
-        weatherJson, route.createdAt.toISOString(),
-        route.walkedAt?.toISOString() || null,
-        route.difficulty, route.safetyScore,
+        route.id, route.name, route.distance, route.duration,
+        JSON.stringify(route.points), 
+        JSON.stringify(route.startLocation),
+        JSON.stringify(route.endLocation),
+        JSON.stringify(route.weatherConditions),
+        route.createdAt.toISOString(), route.walkedAt?.toISOString() || null,
+        route.difficulty, route.safetyScore
       ]
     );
   }
@@ -149,11 +94,26 @@ class DatabaseService {
   async getAllRoutes(): Promise<Route[]> {
     if (!this.db) return [];
 
-    const results = await this.db.getAllAsync(
-      'SELECT * FROM routes ORDER BY created_at DESC'
-    );
-
-    return results.map((row: any) => this.convertRowToRoute(row));
+    try {
+      const results = await this.db.getAllAsync('SELECT * FROM routes ORDER BY created_at DESC');
+      return results.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        distance: row.distance,
+        duration: row.duration,
+        points: JSON.parse(row.points || '[]'),
+        startLocation: JSON.parse(row.start_location || '{"latitude":0,"longitude":0}'),
+        endLocation: JSON.parse(row.end_location || '{"latitude":0,"longitude":0}'),
+        weatherConditions: JSON.parse(row.weather || '{}'),
+        createdAt: new Date(row.created_at),
+        walkedAt: row.walked_at ? new Date(row.walked_at) : undefined,
+        difficulty: row.difficulty,
+        safetyScore: row.safety_score
+      }));
+    } catch (error) {
+      console.error('Error loading routes:', error);
+      return [];
+    }
   }
 
   async markRouteAsWalked(routeId: string): Promise<void> {
@@ -169,86 +129,101 @@ class DatabaseService {
     await this.db.runAsync('DELETE FROM routes WHERE id = ?', [routeId]);
   }
 
-  // Basic preferences operations
+  // Super simple preferences - just use key-value store
   async saveUserPreferences(preferences: UserPreferences): Promise<void> {
-    if (!this.db) return;
+    if (!this.db) {
+      console.error('Database not initialized');
+      return;
+    }
 
-    await this.db.runAsync(
-      `INSERT OR REPLACE INTO user_preferences (
-        id, units, temperature_units, updated_at
-      ) VALUES (1, ?, ?, ?)`,
-      [
-        preferences.units || 'metric',
-        preferences.temperatureUnits || 'celsius',
-        new Date().toISOString(),
-      ]
-    );
+    try {
+      console.log('Saving preferences to database');
+      
+      // Use a transaction to ensure all operations succeed or fail together
+      await this.db.withTransactionAsync(async () => {
+        // Clear existing preferences
+        await this.db!.runAsync('DELETE FROM preferences');
+        
+        // Insert new preferences as key-value pairs
+        const entries = Object.entries(preferences);
+        for (const [key, value] of entries) {
+          await this.db!.runAsync(
+            'INSERT INTO preferences (key, value) VALUES (?, ?)',
+            [key, String(value)]
+          );
+        }
+      });
+      
+      console.log('Preferences saved successfully');
+    } catch (error) {
+      console.error('Error saving preferences to database:', error);
+      throw error;
+    }
   }
 
   async getUserPreferences(): Promise<UserPreferences | null> {
-    if (!this.db) return null;
-
-    const result = await this.db.getFirstAsync(
-      'SELECT * FROM user_preferences WHERE id = 1'
-    );
-
-    if (result) {
-      const row = result as any;
-      return {
-        preferredDuration: 30, // Default
-        avoidHighways: true,   // Default
-        preferShadedRoutes: true, // Default
-        preferQuietStreets: true, // Default
-        weatherSensitivity: 'moderate', // Default
-        units: row.units as 'metric' | 'imperial' | undefined,
-        temperatureUnits: row.temperature_units as 'celsius' | 'fahrenheit' | undefined,
-      };
+    if (!this.db) {
+      console.error('Database not initialized');
+      return null;
     }
 
-    return null;
-  }
-
-  // Simple stats - just basic totals from completed routes
-  async getUserStats(): Promise<UserStats | null> {
-    if (!this.db) return null;
-
     try {
-      const completedRoutes = await this.db.getAllAsync(
-        'SELECT distance, duration, walked_at FROM routes WHERE walked_at IS NOT NULL ORDER BY walked_at DESC'
-      );
+      const result = await this.db.getAllAsync('SELECT * FROM preferences');
       
-      let totalDistance = 0;
-      let totalTime = 0;
-      let lastWalkDate: Date | undefined;
+      const prefs: any = {};
+      result.forEach((row: any) => {
+        prefs[row.key] = row.value;
+      });
       
-      for (const route of completedRoutes) {
-        const routeData = route as any;
-        totalDistance += routeData.distance || 0;
-        totalTime += routeData.duration || 0;
-        
-        const walkedAt = new Date(routeData.walked_at);
-        if (!lastWalkDate || walkedAt > lastWalkDate) {
-          lastWalkDate = walkedAt;
-        }
-      }
-      
-      const currentStreak = this.calculateSimpleStreak(completedRoutes);
-      
-      return {
-        totalRoutes: completedRoutes.length,
-        totalDistance,
-        totalTime,
-        currentStreak,
-        lastWalkDate,
+      const finalPrefs = {
+        preferredDuration: parseInt(prefs.preferredDuration) || 30,
+        avoidHighways: prefs.avoidHighways === 'true',
+        preferShadedRoutes: prefs.preferShadedRoutes === 'true',
+        preferQuietStreets: prefs.preferQuietStreets === 'true',
+        weatherSensitivity: prefs.weatherSensitivity || 'medium',
+        units: prefs.units || 'metric',
+        temperatureUnits: prefs.temperatureUnits || 'celsius',
       };
+      
+      return finalPrefs;
     } catch (error) {
-      console.error('Error getting user stats:', error);
+      console.error('Error getting preferences from database:', error);
       return null;
     }
   }
 
-  // Simple streak calculation - just count consecutive days with walks
-  private calculateSimpleStreak(completedRoutes: any[]): number {
+  // Super simple stats - just basic totals
+  async getUserStats(): Promise<UserStats | null> {
+    if (!this.db) return null;
+
+    const completedRoutes = await this.db.getAllAsync(
+      'SELECT distance, duration, walked_at FROM routes WHERE walked_at IS NOT NULL'
+    );
+
+    let totalDistance = 0;
+    let totalTime = 0;
+    let lastWalkDate: Date | undefined;
+
+    completedRoutes.forEach((route: any) => {
+      totalDistance += route.distance || 0;
+      totalTime += route.duration || 0;
+      
+      const walkedAt = new Date(route.walked_at);
+      if (!lastWalkDate || walkedAt > lastWalkDate) {
+        lastWalkDate = walkedAt;
+      }
+    });
+    
+    return {
+      totalRoutes: completedRoutes.length,
+      totalDistance,
+      totalTime,
+      currentStreak: this.calculateStreak(completedRoutes),
+      lastWalkDate,
+    };
+  }
+
+  private calculateStreak(completedRoutes: any[]): number {
     if (completedRoutes.length === 0) return 0;
     
     const today = new Date();
@@ -273,29 +248,6 @@ class DatabaseService {
     return streak;
   }
 
-  // Helper function to convert database row to Route object
-  private convertRowToRoute(row: any): Route {
-    return {
-      id: row.id,
-      name: row.name,
-      distance: row.distance,
-      duration: row.duration,
-      points: JSON.parse(row.points),
-      startLocation: {
-        latitude: row.start_latitude,
-        longitude: row.start_longitude,
-      },
-      endLocation: {
-        latitude: row.end_latitude,
-        longitude: row.end_longitude,
-      },
-      weatherConditions: JSON.parse(row.weather_conditions),
-      createdAt: new Date(row.created_at),
-      walkedAt: row.walked_at ? new Date(row.walked_at) : undefined,
-      difficulty: (row.difficulty as 'easy' | 'moderate' | 'hard') || 'easy',
-      safetyScore: (row.safety_score as number) ?? 80,
-    };
-  }
 }
 
 export const databaseService = new DatabaseService();

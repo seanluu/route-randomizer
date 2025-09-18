@@ -9,8 +9,26 @@ export const DEFAULT_LONGITUDE_DELTA = 0.01;
 
 // Route generation
 export const DIRECTIONS_BASE_URL = 'https://maps.googleapis.com/maps/api/directions/json';
-export const MAX_ATTEMPTS = 15;
-export const BASE_SAFETY_SCORE = 85;
+export const DIRECTIONS_TIMEOUT_MS = 10000; // 10s
 
-// Weather
-export const WEATHER_CACHE_DURATION = 10 * 60 * 1000;
+// Default values
+export const DEFAULT_WEATHER = {
+  temperature: 20,
+  humidity: 50,
+  windSpeed: 10,
+  windDirection: 0,
+  precipitation: 0,
+  weatherCode: 800,
+  description: 'Clear',
+  icon: '☀️'
+} as const;
+
+export const DEFAULT_USER_PREFERENCES = {
+  preferredDuration: 30,
+  avoidHighways: true,
+  preferShadedRoutes: true,
+  preferQuietStreets: true,
+  weatherSensitivity: 'medium' as const,
+  units: 'metric' as const,
+  temperatureUnits: 'celsius' as const
+} as const;

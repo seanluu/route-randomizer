@@ -1,111 +1,122 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { databaseService } from '@/services/DatabaseService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Type definitions for the app's unit systems
 export type Units = 'metric' | 'imperial';
+export type TemperatureUnits = 'celsius' | 'fahrenheit';
 
-// Interface defining what data and functions the context provides
-interface AppContextType {
-  // Distance units (metric = km, imperial = miles)
+interface PreferencesContextType {
   units: Units;
-  setUnits: (units: Units) => void;
-  
-  // Temperature units
-  temperatureUnits: 'celsius' | 'fahrenheit';
-  setTemperatureUnits: (units: 'celsius' | 'fahrenheit') => void;
-  formatTemperature: (celsius: number) => string;
+  temperatureUnits: TemperatureUnits;
+  avoidHighways: boolean;
+  preferShadedRoutes: boolean;
+  setUnits: (units: Units) => Promise<void>;
+  setTemperatureUnits: (units: TemperatureUnits) => Promise<void>;
+  setAvoidHighways: (value: boolean) => Promise<void>;
+  setPreferShadedRoutes: (value: boolean) => Promise<void>;
+  formatTemperature: (celsius: number, units: TemperatureUnits) => string;
 }
 
-// Create the context (this will be used by components to access app state)
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
 
-interface AppProviderProps {
+export const usePreferences = () => {
+  const context = useContext(PreferencesContext);
+  if (!context) {
+    throw new Error('usePreferences must be used within a PreferencesProvider');
+  }
+  return context;
+};
+
+interface PreferencesProviderProps {
   children: ReactNode;
 }
 
-// Main provider component that wraps the entire app
-export function AppProvider({ children }: AppProviderProps) {
-  // State for distance units (metric or imperial)
+export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ children }) => {
   const [units, setUnitsState] = useState<Units>('metric');
-  
-  // State for temperature units (celsius or fahrenheit)
-  const [temperatureUnits, setTemperatureUnitsState] = useState<'celsius' | 'fahrenheit'>('celsius');
-  
+  const [temperatureUnits, setTemperatureUnitsState] = useState<TemperatureUnits>('celsius');
+  const [avoidHighways, setAvoidHighwaysState] = useState<boolean>(false);
+  const [preferShadedRoutes, setPreferShadedRoutesState] = useState<boolean>(false);
 
-  // Load user preferences from database when the app starts
+  // Load preferences on mount
   useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const [savedUnits, savedTempUnits, savedAvoidHighways, savedPreferShaded] = await Promise.all([
+          AsyncStorage.getItem('units').then(units => (units as Units) || 'metric'),
+          AsyncStorage.getItem('temperatureUnits').then(units => (units as TemperatureUnits) || 'celsius'),
+          AsyncStorage.getItem('avoidHighways').then(value => value === 'true'),
+          AsyncStorage.getItem('preferShadedRoutes').then(value => value === 'true')
+        ]);
+        
+        setUnitsState(savedUnits);
+        setTemperatureUnitsState(savedTempUnits);
+        setAvoidHighwaysState(savedAvoidHighways);
+        setPreferShadedRoutesState(savedPreferShaded);
+      } catch (error) {
+        console.error('Failed to load preferences:', error);
+      }
+    };
+    
     loadPreferences();
   }, []);
 
-  // Load saved preferences from the database
-  const loadPreferences = async () => {
-    const preferences = await databaseService.getUserPreferences();
-    if (preferences) {
-      // Update units if saved in database
-      if (preferences.units) {
-        setUnitsState(preferences.units);
-      }
-      // Update temperature units if saved in database
-      if (preferences.temperatureUnits) {
-        setTemperatureUnitsState(preferences.temperatureUnits);
-      }
+  const setUnits = async (newUnits: Units) => {
+    try {
+      await AsyncStorage.setItem('units', newUnits);
+      setUnitsState(newUnits);
+    } catch (error) {
+      console.error('Failed to save units:', error);
     }
   };
 
-  // Helper function to save preferences to database
-  const savePreference = async (key: 'units' | 'temperatureUnits', value: any) => {
-    const preferences = await databaseService.getUserPreferences();
-    if (preferences) {
-      const updatedPreferences = { ...preferences, [key]: value };
-      await databaseService.saveUserPreferences(updatedPreferences);
+  const setTemperatureUnits = async (newUnits: TemperatureUnits) => {
+    try {
+      await AsyncStorage.setItem('temperatureUnits', newUnits);
+      setTemperatureUnitsState(newUnits);
+    } catch (error) {
+      console.error('Failed to save temperature units:', error);
     }
   };
 
-  // Handle changing distance units (metric/imperial)
-  const handleSetUnits = async (newUnits: Units) => {
-    setUnitsState(newUnits);
-    await savePreference('units', newUnits);
+  const setAvoidHighways = async (value: boolean) => {
+    try {
+      await AsyncStorage.setItem('avoidHighways', value.toString());
+      setAvoidHighwaysState(value);
+    } catch (error) {
+      console.error('Failed to save avoid highways setting:', error);
+    }
   };
 
-  // Handle changing temperature units (celsius/fahrenheit)
-  const handleSetTemperatureUnits = async (newUnits: 'celsius' | 'fahrenheit') => {
-    setTemperatureUnitsState(newUnits);
-    await savePreference('temperatureUnits', newUnits);
+  const setPreferShadedRoutes = async (value: boolean) => {
+    try {
+      await AsyncStorage.setItem('preferShadedRoutes', value.toString());
+      setPreferShadedRoutesState(value);
+    } catch (error) {
+      console.error('Failed to save prefer shaded routes setting:', error);
+    }
   };
 
-  // Format temperature with the appropriate unit symbol
-  const formatTemperature = (celsius: number): string => {
-    const temp = temperatureUnits === 'fahrenheit' ? (celsius * 9/5) + 32 : celsius;
-    const unit = temperatureUnits === 'fahrenheit' ? '°F' : '°C';
-    return `${Math.round(temp)}${unit}`;
+  const formatTemperature = (celsius: number, units: TemperatureUnits): string => {
+    if (units === 'fahrenheit') {
+      return `${Math.round(celsius * 9/5 + 32)}°F`;
+    }
+    return `${Math.round(celsius)}°C`;
   };
 
-  // Create the context value object
-  const value: AppContextType = {
+  const value: PreferencesContextType = {
     units,
-    setUnits: handleSetUnits,
     temperatureUnits,
-    setTemperatureUnits: handleSetTemperatureUnits,
+    avoidHighways,
+    preferShadedRoutes,
+    setUnits,
+    setTemperatureUnits,
+    setAvoidHighways,
+    setPreferShadedRoutes,
     formatTemperature,
   };
 
   return (
-    <AppContext.Provider value={value}>
+    <PreferencesContext.Provider value={value}>
       {children}
-    </AppContext.Provider>
+    </PreferencesContext.Provider>
   );
-}
-
-// Hook to access the app context (must be used inside AppProvider)
-export function useApp(): AppContextType {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
-}
-
-// Simplified hook - get all app context data
-export const useAppContext = () => {
-  return useApp();
 };
