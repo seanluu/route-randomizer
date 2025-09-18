@@ -20,7 +20,7 @@ export function useCurrentLocation() {
         setCurrentLocation(fallback);
         setError('Using fallback location.');
       }
-    } catch (err) {
+    } catch {
       setError('Unable to get location.');
     } finally {
       setIsLoading(false);

@@ -8,15 +8,13 @@ import { MAP_HEIGHT, DEFAULT_LATITUDE_DELTA, DEFAULT_LONGITUDE_DELTA } from '@/c
 interface RouteMapProps {
   route?: Route | null;
   currentLocation?: Location | null;
-  style?: any;
-  showRefreshButton?: boolean;
+  style?: object;
 }
 
 export const RouteMap: React.FC<RouteMapProps> = ({
   route,
   currentLocation,
   style,
-  showRefreshButton = true,
 }) => {
   const mapRef = useRef<MapView>(null);
 
@@ -66,7 +64,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
     }
   };
 
-  // first loading location
+  // Get initial region for map
   const getInitialRegion = () => {
     return calculateMapRegion();
   };
@@ -82,14 +80,12 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         showsCompass={true}
       >
         {/* Refresh button */}
-        {showRefreshButton && (
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={centerOnLocation}
-          >
-            <Ionicons name="refresh" size={20} color="#4A90E2" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={centerOnLocation}
+        >
+          <Ionicons name="refresh" size={20} color="#4A90E2" />
+        </TouchableOpacity>
 
         {/* Current location marker */}
         {currentLocation && (

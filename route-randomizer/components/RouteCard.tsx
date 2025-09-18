@@ -1,9 +1,8 @@
-import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Route, getDifficultyColor, getSafetyColor } from '@/utils';
 import { locationService } from '@/services/LocationService';
-import { commonCard, commonButton, commonText } from '@/styles/common';
+import { getDifficultyColor, getSafetyColor, Route } from '@/utils';
+import { card, button } from '@/styles/common';
 
 interface RouteCardProps {
   route: Route;
@@ -14,13 +13,6 @@ interface RouteCardProps {
 }
 
 export default function RouteCard({ route, onStartNavigation, onViewDetails, units = 'metric', showNavigationButton = true }: RouteCardProps) {
-
-  // Helper function to get safety level text based on score
-  const getSafetyLevel = (score: number) => {
-    if (score >= 80) return 'Very Safe';
-    if (score >= 60) return 'Moderate';
-    return 'Use Caution';
-  };
 
   // Check if we should show the navigation button
   const shouldShowNavigation = showNavigationButton && onStartNavigation;
@@ -52,7 +44,7 @@ export default function RouteCard({ route, onStartNavigation, onViewDetails, uni
         <View style={styles.statItem}>
           <Ionicons name="shield-checkmark" size={20} color={getSafetyColor(route.safetyScore)} />
           <Text style={styles.statValue}>{route.safetyScore}%</Text>
-          <Text style={styles.statLabel}>{getSafetyLevel(route.safetyScore)}</Text>
+          <Text style={styles.statLabel}>Safety</Text>
         </View>
       </View>
 
@@ -81,7 +73,7 @@ export default function RouteCard({ route, onStartNavigation, onViewDetails, uni
 }
 
 const styles = StyleSheet.create({
-  container: commonCard,
+  container: card,
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -132,26 +124,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   secondaryButton: {
-    ...commonButton,
+    ...button,
     flex: 1,
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
   secondaryButtonText: {
-    ...commonText,
+    fontSize: 14,
+    fontWeight: '600',
     color: '#4A90E2',
     marginLeft: 5,
   },
   primaryButton: {
-    ...commonButton,
+    ...button,
     flex: 2,
     backgroundColor: '#4A90E2',
   },
   primaryButtonText: {
-    ...commonText,
-    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#fff',
     marginLeft: 5,
   },
 });

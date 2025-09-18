@@ -1,8 +1,7 @@
-import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MILES_TO_METERS, KM_TO_METERS } from '@/constants';
-import { lightCard, iconButton, primaryText } from '@/styles/common';
+import { card } from '@/styles/common';
 
 interface DistanceSelectorProps {
   selectedDistance: number;
@@ -60,12 +59,22 @@ export default function DistanceSelector({ selectedDistance, onDistanceChange, u
 }
 
 const styles = StyleSheet.create({
-  container: lightCard,
+  container: {
+    ...card,
+    marginTop: 5,
+    padding: 20,
+  },
   header: { marginBottom: 20 },
-  title: { ...primaryText, fontSize: 18, fontWeight: 'bold' },
+  title: { 
+    fontSize: 18, 
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
   presetContainer: { paddingHorizontal: 5 },
   presetButton: {
-    ...iconButton,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 20,
     marginHorizontal: 5,

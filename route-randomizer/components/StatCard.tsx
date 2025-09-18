@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,46 +6,20 @@ interface StatCardProps {
   value: string | number;
   label?: string;
   color?: string;
-  size?: 'small' | 'medium' | 'large';
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
   icon,
   value,
   label,
-  color = '#4A90E2',
-  size = 'medium'
+  color = '#4A90E2'
 }) => {
-  // Size configurations for different stat card sizes
-  const sizeConfig = {
-    small: { iconSize: 14, textSize: 12 },
-    medium: { iconSize: 16, textSize: 14 },
-    large: { iconSize: 20, textSize: 16 },
-  };
-
-  // Get the current size configuration
-  const currentSize = sizeConfig[size];
-
   return (
     <View style={styles.container}>
-      {/* Icon */}
-      <Ionicons 
-        name={icon} 
-        size={currentSize.iconSize} 
-        color={color} 
-        style={styles.icon}
-      />
-      
-      {/* Content area with value and optional label */}
+      <Ionicons name={icon} size={16} color={color} style={styles.icon} />
       <View style={styles.content}>
-        <Text style={[styles.value, { fontSize: currentSize.textSize }]}>
-          {value}
-        </Text>
-        {label && (
-          <Text style={[styles.label, { fontSize: currentSize.textSize - 2 }]}>
-            {label}
-          </Text>
-        )}
+        <Text style={styles.value}>{value}</Text>
+        {label && <Text style={styles.label}>{label}</Text>}
       </View>
     </View>
   );
@@ -76,11 +49,13 @@ const styles = StyleSheet.create({
   },
   
   value: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
   },
   
   label: {
+    fontSize: 12,
     color: '#666',
   },
 });
