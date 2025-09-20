@@ -17,8 +17,8 @@ class RouteGenerationService {
     preferences: UserPreferences,
     weatherConditions: WeatherConditions
   ): Promise<Route | null> {
-    // Try minimal scales for faster success while keeping <= target
-    const distanceScales = [0.75, 0.65];
+    // more scales to get closer to target distance
+    const distanceScales = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3];
     for (const scale of distanceScales) {
       try {
         const destination = this.generateDestinationWithScale(startLocation, targetDistance, scale);
@@ -44,8 +44,10 @@ class RouteGenerationService {
   private isValidRoute(routeData: any, targetDistance: number): boolean {
     if (!routeData?.points || routeData.points.length < 2) return false;
     const actualDistance = this.calculateTotalDistance(routeData.points);
-    // Routes must be at or under the target distance
-    return actualDistance <= targetDistance && actualDistance > 0;
+    // Accept routes that are 70-100% of target distance
+    const minDistance = targetDistance * 0.7;
+    const maxDistance = targetDistance * 1.0;
+    return actualDistance >= minDistance && actualDistance <= maxDistance;
   }
 
   private createRoute(
@@ -117,7 +119,7 @@ class RouteGenerationService {
       }
       
       const points = this.decodeRoutePoints(route.overview_polyline?.points);
-      const duration = route.legs.reduce((total: number, leg: any) => total + leg.duration.value, 0);
+      const duration = route.legs.reduce((total: number, leg: { duration: { value: number } }) => total + leg.duration.value, 0);
       
       return { points, duration };
     } catch (error) {
