@@ -137,8 +137,6 @@ class DatabaseService {
     }
 
     try {
-      console.log('Saving preferences to database');
-      
       // Use a transaction to ensure all operations succeed or fail together
       await this.db.withTransactionAsync(async () => {
         // Clear existing preferences
@@ -153,8 +151,6 @@ class DatabaseService {
           );
         }
       });
-      
-      console.log('Preferences saved successfully');
     } catch (error) {
       console.error('Error saving preferences to database:', error);
       throw error;

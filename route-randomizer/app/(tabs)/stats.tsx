@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 
 import { UserStats, formatDate } from '@/utils';
 import { databaseService } from '@/services/DatabaseService';
@@ -34,9 +35,12 @@ export default function StatsScreen() {
     }
   };
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  // Refresh stats whenever the tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadStats();
+    }, [])
+  );
 
   if (isLoading || !stats) {
     return (

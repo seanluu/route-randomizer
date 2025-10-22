@@ -1,47 +1,152 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useCurrentLocation } from '@/hooks';
 import {
   View,
   Text,
   StyleSheet,
+  TouchableOpacity,
   ScrollView,
+  Alert,
   ActivityIndicator,
+  Linking,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 
-import { UserStats, formatDate } from '@/utils';
-import { databaseService } from '@/services/DatabaseService';
 import { locationService } from '@/services/LocationService';
+import { routeGenerationService } from '@/services/RouteGenerationService';
+import { databaseService } from '@/services/DatabaseService';
+import { Route, getDifficultyColor, getSafetyColor, formatDate } from '@/utils';
 import { usePreferences } from '@/context/AppContext';
+import { DEFAULT_WEATHER, DEFAULT_USER_PREFERENCES } from '@/constants';
+import { RouteMap } from '@/components/RouteMap';
+import { card, button } from '@/styles/common';
 
-import { card } from '@/styles/common';
-
-export default function StatsScreen() {
+export default function RouteGenerationScreen() {
+  const params = useLocalSearchParams();
+  
+  const selectedDistance = parseFloat(params.selectedDistance as string) || 1609;
+  const weather = params.weather ? JSON.parse(params.weather as string) : DEFAULT_WEATHER;
+  const userPreferences = params.userPreferences ? JSON.parse(params.userPreferences as string) : DEFAULT_USER_PREFERENCES;
+  const existingRoute = params.route ? JSON.parse(params.route as string) : null;
+  const isViewingHistory = params.isViewingHistory === 'true';
+  
+  const [generatedRoute, setGeneratedRoute] = useState<Route | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const { currentLocation, isLoading: isLocating, error: locationError, fetchLocation } = useCurrentLocation();
   const { units } = usePreferences();
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const loadStats = async () => {
+  const isCompleted = !!generatedRoute?.walkedAt;
+  const canShowRoute = generatedRoute?.name && generatedRoute?.points?.length > 0;
+
+  useEffect(() => {
+    fetchLocation();
+  }, []);
+
+  useEffect(() => {
+    if (isViewingHistory && existingRoute) {
+      setGeneratedRoute({
+        ...existingRoute,
+        createdAt: new Date(existingRoute.createdAt),
+        walkedAt: existingRoute.walkedAt ? new Date(existingRoute.walkedAt) : undefined,
+      } as Route);
+    }
+  }, [isViewingHistory, existingRoute]);
+
+  const requestRoute = async () => {
+    if (!currentLocation || isGenerating) return;
+    
+    setIsGenerating(true);
     try {
-      const data = await databaseService.getUserStats();
-      setStats(data);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
+      const route = await routeGenerationService.generateRoute({
+        startLocation: currentLocation,
+        distance: selectedDistance,
+        preferences: userPreferences,
+        weatherConditions: weather,
+      });
+      
+      if (!route) throw new Error('Route generation failed');
+      await databaseService.saveRoute(route);
+      setGeneratedRoute(route);
+    } catch {
+      Alert.alert('Route Generation Failed', 'Unable to find a suitable walking route.');
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (!isViewingHistory && currentLocation && !generatedRoute) {
+      requestRoute();
+    }
+  }, [currentLocation, isViewingHistory, generatedRoute]);
 
-  if (isLoading || !stats) {
+  const markAsCompleted = async () => {
+    if (!generatedRoute) return;
+    
+    try {
+      await databaseService.markRouteAsWalked(generatedRoute.id);
+      setGeneratedRoute({ ...generatedRoute, walkedAt: new Date() });
+      Alert.alert('Route Completed!', 'Great job!');
+    } catch {
+      Alert.alert('Error', 'Failed to mark route as completed.');
+    }
+  };
+
+  const generateDifferentRoute = () => {
+    if (!currentLocation || isGenerating) return;
+    setGeneratedRoute(null);
+    requestRoute();
+  };
+
+  const startNavigation = async () => {
+    if (!generatedRoute) {
+      Alert.alert('Error', 'No route available.');
+      return;
+    }
+  
+    const endCoords = `${generatedRoute.endLocation.latitude},${generatedRoute.endLocation.longitude}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${endCoords}&travelmode=walking`;
+  
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Navigation Error', 'Unable to open Google Maps.');
+    }
+  };
+
+  const shareRoute = () => {
+    if (!generatedRoute) return;
+    
+    const shareMessage = `Check out this walking route: ${generatedRoute.name}\n\nDistance: ${locationService.formatDistance(generatedRoute.distance, units)}\nDuration: ${locationService.formatDuration(generatedRoute.duration)}\n\nGenerated by Route Randomizer`;
+    
+    Share.share({ message: shareMessage, title: generatedRoute.name });
+  };
+
+  if (isLocating) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <View style={styles.centeredContainer}>
           <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>Loading stats...</Text>
+          <Text style={styles.loadingText}>Getting your location...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (locationError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centeredContainer}>
+          <Text style={styles.errorTitle}>Location Error</Text>
+          <Text style={styles.errorMessage}>{locationError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchLocation}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -49,56 +154,119 @@ export default function StatsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Your Stats</Text>
-          <Text style={styles.subtitle}>Track your walking progress</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#4A90E2" />
+          </TouchableOpacity>
+          <Text style={styles.title}>
+            {isViewingHistory ? 'Route Details' : 'Generating Route'}
+          </Text>
         </View>
 
-        <View style={styles.overviewSection}>
-          <LinearGradient
-            colors={['#4A90E2', '#357ABD']}
-            style={styles.overviewGradient}
+        {isGenerating && (
+          <View style={styles.generationStatus}>
+            <LinearGradient
+              colors={['#4A90E2', '#357ABD']}
+              style={styles.generationStatusGradient}
+            >
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={styles.generationStatusText}>
+                Creating your perfect route...
+              </Text>
+            </LinearGradient>
+          </View>
+        )}
+
+        <RouteMap
+          route={generatedRoute}
+          currentLocation={currentLocation}
+          style={styles.mapContainer}
+        />
+
+        {canShowRoute && (
+          <>
+            <View style={styles.routeInfo}>
+              <Text style={styles.routeName}>{generatedRoute!.name}</Text>
+              <Text style={styles.routeDate}>
+                Created on {formatDate(generatedRoute!.createdAt)}
+              </Text>
+            </View>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Ionicons name="map" size={24} color="#4A90E2" />
+                <Text style={styles.statValue}>
+                  {locationService.formatDistance(generatedRoute!.distance, units)}
+                </Text>
+                <Text style={styles.statLabel}>Distance</Text>
+              </View>
+              
+              <View style={styles.statCard}>
+                <Ionicons name="time-outline" size={24} color="#4A90E2" />
+                <Text style={styles.statValue}>
+                  {locationService.formatDuration(generatedRoute!.duration)}
+                </Text>
+                <Text style={styles.statLabel}>Duration</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="trending-up" size={24} color={getDifficultyColor(generatedRoute!.difficulty)} />
+                <Text style={styles.statValue}>{generatedRoute!.difficulty.toUpperCase()}</Text>
+                <Text style={styles.statLabel}>Difficulty</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="shield-checkmark" size={24} color={getSafetyColor(generatedRoute!.safetyScore)} />
+                <Text style={styles.statValue}>{generatedRoute!.safetyScore}%</Text>
+                <Text style={styles.statLabel}>Safety</Text>
+              </View>
+            </View>
+
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={shareRoute}>
+                <Ionicons name="share" size={20} color="#4A90E2" />
+                <Text style={styles.secondaryButtonText}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={isCompleted ? undefined : markAsCompleted}
+                disabled={isCompleted}
+              >
+                <Ionicons name="checkmark-circle" size={20} color={isCompleted ? "#4CAF50" : "#4A90E2"} />
+                <Text style={[styles.secondaryButtonText, { color: isCompleted ? "#4CAF50" : "#4A90E2" }]}>
+                  {isCompleted ? 'Completed' : 'Mark Complete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.mainButton, styles.navigationButton]}
+              onPress={startNavigation}
+            >
+              <Ionicons name="navigate" size={24} color="#fff" />
+              <Text style={styles.mainButtonText}>Start Navigation</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.mainButton, styles.greenButton]}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="home" size={20} color="#fff" />
+              <Text style={styles.mainButtonText}>Save & Go Home</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {!isGenerating && canShowRoute && (
+          <TouchableOpacity
+            style={[styles.mainButton, styles.redButton, styles.regenerateButton]}
+            onPress={generateDifferentRoute}
           >
-            <View style={styles.overviewContent}>
-              <View style={styles.overviewItem}>
-                <Text style={styles.overviewValue}>{stats.totalRoutes}</Text>
-                <Text style={styles.overviewLabel}>Routes</Text>
-              </View>
-              <View style={styles.overviewDivider} />
-              <View style={styles.overviewItem}>
-                <Text style={styles.overviewValue}>{locationService.formatDistance(stats.totalDistance, units)}</Text>
-                <Text style={styles.overviewLabel}>Total Distance</Text>
-              </View>
-              <View style={styles.overviewDivider} />
-              <View style={styles.overviewItem}>
-                <Text style={styles.overviewValue}>{locationService.formatDuration(stats.totalTime)}</Text>
-                <Text style={styles.overviewLabel}>Total Time</Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Current Streak</Text>
-          <View style={styles.streakContainer}>
-            <View style={styles.info}>
-              <Text style={styles.icon}>🔥</Text>
-              <View style={styles.text}>
-                <Text style={styles.value}>{stats.currentStreak} days</Text>
-                <Text style={styles.label}>Current Streak</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {stats.lastWalkDate && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Last Walk</Text>
-            <View style={styles.card}>
-              <Text style={styles.cardText}>{formatDate(stats.lastWalkDate)}</Text>
-            </View>
-          </View>
+            <Ionicons name="refresh" size={24} color="#fff" />
+            <Text style={styles.mainButtonText}>Generate Different Route</Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -110,21 +278,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  scrollView: {
+  },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
     paddingBottom: 10,
   },
+  backButton: {
+    padding: 8,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 40,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  overviewSection: {
-    margin: 20,
+  generationStatus: {
+    marginHorizontal: 20,
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 3,
@@ -133,90 +307,132 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  overviewGradient: {
-    padding: 20,
-  },
-  overviewContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  overviewItem: {
+  generationStatusGradient: {
+    padding: 30,
     alignItems: 'center',
-    flex: 1,
   },
-  overviewValue: {
-    fontSize: 24,
+  generationStatusText: {
+    color: '#fff',
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    marginTop: 15,
   },
-  overviewLabel: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  overviewDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  section: {
+  mapContainer: {
     ...card,
-    marginHorizontal: 20,
-    marginVertical: 5,
+  },
+  routeInfo: {
     padding: 15,
   },
-  sectionTitle: {
+  routeName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  routeDate: {
+    fontSize: 14,
+    color: '#666',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    padding: 15,
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 2,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
   },
-  streakContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  info: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  icon: {
-    fontSize: 32,
-    marginRight: 15,
-  },
-  text: {
-  },
-  value: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  label: {
-    fontSize: 16,
+  statLabel: {
+    fontSize: 12,
     color: '#666',
   },
-  card: {
+  actionButtons: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 15,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    marginTop: -15,
+    gap: 8,
   },
-  cardText: {
+  secondaryButton: {
+    flex: 1,
+    ...button,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  secondaryButtonText: {
+    color: '#4A90E2',
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-    marginLeft: 10,
+    marginLeft: 5,
   },
-  loadingContainer: {
+  mainButton: {
+    ...button,
+    marginTop: 15,
+    marginHorizontal: 20,
+  },
+  mainButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  navigationButton: {
+    backgroundColor: '#4A90E2',
+  },
+  redButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  greenButton: {
+    backgroundColor: '#4CAF50',
+  },
+  regenerateButton: {
+    marginBottom: 15,
+  },
+  centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 32,
   },
   loadingText: {
-    marginTop: 15,
     fontSize: 16,
     color: '#555',
+    marginTop: 16,
+  },
+  errorTitle: {
+    fontSize: 18,
+    color: '#F44336',
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

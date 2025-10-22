@@ -13,10 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-import { locationService } from '@/services/LocationService';
 import { weatherService } from '@/services/WeatherService';
+import { useCurrentLocation } from '@/hooks';
 
-import { Location, WeatherConditions, UserPreferences } from '@/utils';
+import { WeatherConditions, UserPreferences } from '@/utils';
 import { usePreferences } from '@/context/AppContext';
 
 import WeatherCard from '@/components/WeatherCard';
@@ -27,9 +27,8 @@ import { card, button } from '@/styles/common';
 export default function HomeScreen() {
   // States
   const { units, avoidHighways, preferShadedRoutes } = usePreferences();
-  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
+  const { currentLocation, isLoading: isLoadingLocation, fetchLocation } = useCurrentLocation();
   const [weather, setWeather] = useState<WeatherConditions | null>(null);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [selectedDistance, setSelectedDistance] = useState(1609);
   
   const userPreferences: UserPreferences = {
@@ -42,44 +41,17 @@ export default function HomeScreen() {
     temperatureUnits: 'celsius',
   };
 
-  const initializeApp = async () => {
-    setIsLoadingLocation(true);
-    
-    try {
-      const location = await locationService.getCurrentLocation();
-      if (location) {
-        setCurrentLocation(location);
-        const weatherData = await weatherService.getCurrentWeather(location);
-        setWeather(weatherData);
-      } else {
-        // Try fallback location
-        const lastLocation = await locationService.getLastKnownLocation();
-        if (lastLocation) {
-          setCurrentLocation(lastLocation);
-          const weatherData = await weatherService.getCurrentWeather(lastLocation);
-          setWeather(weatherData);
-        } else {
-          Alert.alert(
-            'Location Required',
-            'This app needs your location to generate walking routes. Please enable location permissions in your device settings.',
-            [
-              { text: 'Settings', onPress: () => locationService.requestPermissions() },
-              { text: 'Cancel', style: 'cancel' }
-            ]
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Failed to initialize app:', error);
-    } finally {
-      setIsLoadingLocation(false);
-    }
-  };
-
-  // Initialize the app when it first loads
+  // Fetch location and weather on mount
   useEffect(() => {
-    initializeApp();
+    fetchLocation();
   }, []);
+
+  // Fetch weather when location is available
+  useEffect(() => {
+    if (currentLocation) {
+      weatherService.getCurrentWeather(currentLocation).then(setWeather);
+    }
+  }, [currentLocation]);
 
   const generateNewRoute = () => {
     // Check if we have all required data
@@ -87,8 +59,6 @@ export default function HomeScreen() {
       Alert.alert('Error', 'Unable to generate route. Please check your location and try again.');
       return;
     }
-
-    console.log('Generating route with preferences:', userPreferences.units);
 
     router.push({
       pathname: '/route-generation',
@@ -126,16 +96,7 @@ export default function HomeScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.locationRequestButton}
-                onPress={async () => {
-                  setIsLoadingLocation(true);
-                  const location = await locationService.getCurrentLocation();
-                  if (location) {
-                    setCurrentLocation(location);
-                    const weatherData = await weatherService.getCurrentWeather(location);
-                    setWeather(weatherData);
-                  }
-                  setIsLoadingLocation(false);
-                }}
+                onPress={fetchLocation}
                 disabled={isLoadingLocation}
               >
                 <Text style={styles.locationRequestButtonText}>Enable Location</Text>

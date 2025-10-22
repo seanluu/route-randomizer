@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { databaseService } from '@/services/DatabaseService';
 import { locationService } from '@/services/LocationService';
@@ -31,9 +31,12 @@ export default function RouteHistoryScreen() {
     }
   };
 
-  useEffect(() => {
-    loadRoutes();
-  }, []);
+  // Refresh routes whenever the tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadRoutes();
+    }, [])
+  );
 
   const filteredRoutes = routes.filter(route => {
     try {

@@ -1,13 +1,13 @@
 import { WeatherConditions, Location } from '@/utils';
 import axios from 'axios';
+import Constants from 'expo-constants';
 
 const BASE_URL = 'https://api.weatherapi.com/v1';
-const WEATHER_API_KEY = process.env.WEATHER_API_KEY || '';
+const WEATHER_API_KEY = Constants.expoConfig?.extra?.weatherApiKey || '';
 
 class WeatherService {
   async getCurrentWeather(location: Location): Promise<WeatherConditions> {
     if (!WEATHER_API_KEY) {
-      console.warn('Weather API key is missing, returning default weather');
       return this.getDefaultWeather();
     }
 
@@ -33,7 +33,6 @@ class WeatherService {
         icon: this.getWeatherIcon(current.condition.code),
       };
     } catch (error) {
-      console.error('Weather API error:', error);
       return this.getDefaultWeather();
     }
   }

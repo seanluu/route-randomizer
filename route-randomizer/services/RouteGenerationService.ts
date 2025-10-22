@@ -1,9 +1,10 @@
 import polyline from '@mapbox/polyline';
 import { Route, Location, RoutePoint, UserPreferences, WeatherConditions, RouteGenerationOptions } from '@/utils';
 import axios from 'axios';
+import Constants from 'expo-constants';
 import { DIRECTIONS_BASE_URL, DIRECTIONS_TIMEOUT_MS } from '@/constants';
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
+const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || '';
 
 class RouteGenerationService {
   async generateRoute(options: RouteGenerationOptions): Promise<Route | null> {
@@ -27,7 +28,7 @@ class RouteGenerationService {
           return this.createRoute(routeData, startLocation, preferences, weatherConditions);
         }
       } catch (error) {
-        console.error('Route generation attempt failed:', error);
+        continue;
       }
     }
     return null;
@@ -97,12 +98,10 @@ class RouteGenerationService {
     destination: Location
   ): Promise<{ points: RoutePoint[], duration: number } | null> {
     if (!GOOGLE_MAPS_API_KEY) {
-      console.warn('Google Maps API key is missing, cannot generate routes');
       return null;
     }
 
     try {
-      
       const response = await axios.get(DIRECTIONS_BASE_URL, {
         params: {
           origin: `${origin.latitude},${origin.longitude}`,
@@ -112,6 +111,10 @@ class RouteGenerationService {
         },
         timeout: DIRECTIONS_TIMEOUT_MS
       });
+      
+      if (response.data.status !== 'OK') {
+        return null;
+      }
       
       const route = response.data.routes?.[0];
       if (!route) {
@@ -123,7 +126,6 @@ class RouteGenerationService {
       
       return { points, duration };
     } catch (error) {
-      console.error('Google Maps API error:', error);
       return null;
     }
   }

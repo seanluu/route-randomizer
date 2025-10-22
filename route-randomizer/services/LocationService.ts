@@ -6,10 +6,8 @@ class LocationService {
   // Cache the last known location for fallback
   private lastKnownLocation: LocationType | null = null;
 
-  
   // Request location permissions from the user
   async requestPermissions(): Promise<boolean> {
-    // try catch is basically second to if else (handles errors) after them
     try {
       const result = await Location.requestForegroundPermissionsAsync();
       return result.status === 'granted';
