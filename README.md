@@ -6,8 +6,8 @@ Route Randomizer is a mobile app that generates random walking routes based on d
 
 Clone the repo and install dependencies:
 ```bash
-git clone https://github.com/seanluu/route-randomizer3.git
-cd route-randomizer3
+git clone https://github.com/seanluu/route-randomizer.git
+cd route-randomizer
 npm install
 ```
 
