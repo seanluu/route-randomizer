@@ -1,6 +1,6 @@
 import '@testing-library/jest-native/extend-expect';
 
-// Basic mocks for native/expo modules used in the app
+// mocks for native/expo modules used
 jest.mock('react-native-maps', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -31,10 +31,8 @@ jest.mock('expo-constants', () => ({
   expoConfig: { extra: { googleMapsApiKey: 'test-google', weatherApiKey: 'test-weather' } },
 }));
 
-// Mock the expo runtime to avoid winter runtime import issues in tests
 jest.mock('expo', () => ({}));
 
-// Mock vector icons and font linking to avoid native module requirements
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
