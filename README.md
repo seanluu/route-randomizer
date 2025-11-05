@@ -23,9 +23,9 @@ Get API keys:
 
 Run the app:
 ```bash
-npm start          # development with Expo Go
-npm run ios        # iOS simulator
-npm run android    # Android emulator
+npm start 
+npm run ios 
+npm run android
 ```
 
 ## ✨ Features
