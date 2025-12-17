@@ -52,9 +52,6 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: Initialize EAS project
-        run: eas init --id 2d7527b4-ac31-47c5-ab11-e415994f5846 --non-interactive
-
       - name: Build iOS app
         run: eas build --platform ios --non-interactive --no-wait
 

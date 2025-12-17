@@ -41,7 +41,10 @@ module.exports = {
     },
     extra: {
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-      weatherApiKey: process.env.WEATHER_API_KEY
+      weatherApiKey: process.env.WEATHER_API_KEY,
+      eas: {
+        projectId: "2d7527b4-ac31-47c5-ab11-e415994f5846"
+      }
     }
   }
 };
