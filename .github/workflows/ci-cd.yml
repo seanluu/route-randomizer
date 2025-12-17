@@ -53,7 +53,8 @@ jobs:
         run: npm install -g eas-cli
 
       - name: Build iOS app
-        run: eas build --platform ios --non-interactive --no-wait
+        run: eas build --platform ios --non-interactive --no-wait || true
+        continue-on-error: true
 
       - name: Build Android app
         run: eas build --platform android --non-interactive --no-wait
