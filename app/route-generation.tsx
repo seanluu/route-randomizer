@@ -1,29 +1,29 @@
-import { useState, useEffect } from 'react';
 import { useCurrentLocation } from '@/hooks';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Linking,
-  Share,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
 
+import { RouteMap } from '@/components/RouteMap';
+import { DEFAULT_USER_PREFERENCES, DEFAULT_WEATHER } from '@/constants';
+import { usePreferences } from '@/context/AppContext';
+import { databaseService } from '@/services/DatabaseService';
 import { locationService } from '@/services/LocationService';
 import { routeGenerationService } from '@/services/RouteGenerationService';
-import { databaseService } from '@/services/DatabaseService';
-import { Route, getDifficultyColor, getSafetyColor, formatDate } from '@/utils';
-import { usePreferences } from '@/context/AppContext';
-import { DEFAULT_WEATHER, DEFAULT_USER_PREFERENCES } from '@/constants';
-import { RouteMap } from '@/components/RouteMap';
-import { card, button } from '@/styles/common';
+import { button, card } from '@/styles/common';
+import { Route, formatDate, getDifficultyColor, getSafetyColor } from '@/utils';
 
 export default function RouteGenerationScreen() {
   const params = useLocalSearchParams();
@@ -45,7 +45,7 @@ export default function RouteGenerationScreen() {
 
   useEffect(() => {
     fetchLocation();
-  }, []);
+  }, [fetchLocation]);
 
   useEffect(() => {
     if (isViewingHistory && existingRoute) {
@@ -57,7 +57,7 @@ export default function RouteGenerationScreen() {
     }
   }, [isViewingHistory, existingRoute]);
 
-  const requestRoute = async () => {
+  const requestRoute = useCallback(async () => {
     if (!currentLocation || isGenerating) return;
     
     setIsGenerating(true);
@@ -77,13 +77,13 @@ export default function RouteGenerationScreen() {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [currentLocation, isGenerating, selectedDistance, userPreferences, weather]);
 
   useEffect(() => {
     if (!isViewingHistory && currentLocation && !generatedRoute) {
       requestRoute();
     }
-  }, [currentLocation, isViewingHistory, generatedRoute]);
+  }, [currentLocation, isViewingHistory, generatedRoute, requestRoute]);
 
   const markAsCompleted = async () => {
     if (!generatedRoute) return;

@@ -1,28 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { weatherService } from '@/services/WeatherService';
 import { useCurrentLocation } from '@/hooks';
+import { weatherService } from '@/services/WeatherService';
 
-import { WeatherConditions, UserPreferences } from '@/utils';
 import { usePreferences } from '@/context/AppContext';
+import { UserPreferences, WeatherConditions } from '@/utils';
 
-import WeatherCard from '@/components/WeatherCard';
 import DistanceSelector from '@/components/DistanceSelector';
 import { RouteMap } from '@/components/RouteMap';
-import { card, button } from '@/styles/common';
+import WeatherCard from '@/components/WeatherCard';
+import { button, card } from '@/styles/common';
 
 export default function HomeScreen() {
   // States
@@ -44,7 +44,7 @@ export default function HomeScreen() {
   // Fetch location and weather on mount
   useEffect(() => {
     fetchLocation();
-  }, []);
+  }, [fetchLocation]);
 
   // Fetch weather when location is available
   useEffect(() => {
