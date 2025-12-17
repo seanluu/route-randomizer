@@ -11,10 +11,12 @@ module.exports = {
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      bundleIdentifier: "com.seanluu.route-randomizer"
     },
     android: {
-      edgeToEdgeEnabled: true
+      edgeToEdgeEnabled: true,
+      package: "com.seanluu.route_randomizer"
     },
     web: {
       bundler: "metro",
