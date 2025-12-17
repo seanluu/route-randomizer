@@ -43,6 +43,10 @@ export interface UserPreferences {
   weatherSensitivity: 'low' | 'medium' | 'high';
   units?: 'metric' | 'imperial'; // metric = km, imperial = miles
   temperatureUnits?: 'celsius' | 'fahrenheit'; // temperature display preference
+  // Notification preferences
+  enableWeatherAlerts?: boolean; // Enable weather-based notifications
+  enableMorningNotifications?: boolean; // Enable morning weather summary
+  morningNotificationTime?: number; // Hour for morning notification (0-23)
 }
 
 export interface RouteGenerationOptions {

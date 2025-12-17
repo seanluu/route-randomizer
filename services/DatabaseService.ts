@@ -179,6 +179,9 @@ class DatabaseService {
         weatherSensitivity: prefs.weatherSensitivity || 'medium',
         units: prefs.units || 'metric',
         temperatureUnits: prefs.temperatureUnits || 'celsius',
+        enableWeatherAlerts: prefs.enableWeatherAlerts === 'true',
+        enableMorningNotifications: prefs.enableMorningNotifications === 'true',
+        morningNotificationTime: parseInt(prefs.morningNotificationTime) || 8,
       };
       
       return finalPrefs;

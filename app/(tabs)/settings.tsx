@@ -1,15 +1,15 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePreferences } from '@/context/AppContext';
 import { card } from '@/styles/common';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const {
@@ -216,5 +216,4 @@ const styles = StyleSheet.create({
   pickerOptionTextSelected: {
     color: '#fff',
   },
-
 });

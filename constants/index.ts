@@ -30,5 +30,8 @@ export const DEFAULT_USER_PREFERENCES = {
   preferQuietStreets: true,
   weatherSensitivity: 'medium' as const,
   units: 'metric' as const,
-  temperatureUnits: 'celsius' as const
+  temperatureUnits: 'celsius' as const,
+  enableWeatherAlerts: false,
+  enableMorningNotifications: false,
+  morningNotificationTime: 8
 } as const;
