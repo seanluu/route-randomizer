@@ -50,6 +50,11 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
+      - name: Login to EAS
+        run: eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Build iOS app
         run: eas build --platform ios --non-interactive --no-wait
         env:
