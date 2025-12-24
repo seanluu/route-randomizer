@@ -1,4 +1,4 @@
-import { weatherService } from '@/services/WeatherService';
+import { weatherService } from '@/backend/services/WeatherService';
 import axios from 'axios';
 
 jest.mock('axios');

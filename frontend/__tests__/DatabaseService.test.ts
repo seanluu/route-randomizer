@@ -1,4 +1,4 @@
-import { databaseService } from '@/services/DatabaseService';
+import { databaseService } from '@/backend/services/DatabaseService';
 import * as SQLite from 'expo-sqlite';
 
 describe('DatabaseService', () => {

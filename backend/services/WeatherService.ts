@@ -1,4 +1,4 @@
-import { WeatherConditions, Location } from '@/utils';
+import { WeatherConditions, Location } from '../utils';
 import axios from 'axios';
 import Constants from 'expo-constants';
 

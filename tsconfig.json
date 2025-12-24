@@ -4,7 +4,10 @@
     "strict": true,
     "paths": {
       "@/*": [
-        "./*"
+        "./frontend/*"
+      ],
+      "@/backend/*": [
+        "./backend/*"
       ]
     },
     "typeRoots": [

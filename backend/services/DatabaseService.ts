@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Route, UserPreferences, UserStats } from '@/utils';
+import { Route, UserPreferences, UserStats } from '../utils';
 
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;

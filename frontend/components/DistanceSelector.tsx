@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MILES_TO_METERS, KM_TO_METERS } from '@/constants';
+import { MILES_TO_METERS, KM_TO_METERS } from '@/backend/constants';
 import { card } from '@/styles/common';
 
 interface DistanceSelectorProps {

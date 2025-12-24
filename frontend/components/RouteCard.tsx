@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { locationService } from '@/services/LocationService';
-import { getDifficultyColor, getSafetyColor, Route } from '@/utils';
+import { locationService } from '@/backend/services/LocationService';
+import { getDifficultyColor, getSafetyColor, Route } from '@/backend/utils';
 import { card, button } from '@/styles/common';
 
 interface RouteCardProps {
