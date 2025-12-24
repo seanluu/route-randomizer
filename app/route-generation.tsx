@@ -4,26 +4,26 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RouteMap } from '@/components/RouteMap';
 import { DEFAULT_USER_PREFERENCES, DEFAULT_WEATHER } from '@/backend/constants';
-import { usePreferences } from '@/context/AppContext';
 import { databaseService } from '@/backend/services/DatabaseService';
 import { locationService } from '@/backend/services/LocationService';
 import { routeGenerationService } from '@/backend/services/RouteGenerationService';
-import { button, card } from '@/styles/common';
 import { Route, formatDate, getDifficultyColor, getSafetyColor } from '@/backend/utils';
+import { RouteMap } from '@/components/RouteMap';
+import { usePreferences } from '@/context/AppContext';
+import { button, card } from '@/styles/common';
 
 export default function RouteGenerationScreen() {
   const params = useLocalSearchParams();
