@@ -34,8 +34,7 @@ export default function StatsScreen() {
       setIsLoading(false);
     }
   };
-
-  // Refresh stats whenever the tab comes into focus
+  
   useFocusEffect(
     React.useCallback(() => {
       loadStats();

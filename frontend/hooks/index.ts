@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { locationService } from '@/backend/services/LocationService';
 import { Location } from '@/backend/utils';
+import { useState } from 'react';
 
 export function useCurrentLocation() {
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);

@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
+import { KM_TO_METERS, MILES_TO_METERS } from '../constants';
 import { Location as LocationType } from '../utils';
-import { MILES_TO_METERS, KM_TO_METERS } from '../constants';
 
 class LocationService {
   // Cache the last known location for fallback

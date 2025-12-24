@@ -1,6 +1,6 @@
-import { WeatherConditions, Location } from '../utils';
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { Location, WeatherConditions } from '../utils';
 
 const BASE_URL = 'https://api.weatherapi.com/v1';
 const WEATHER_API_KEY = Constants.expoConfig?.extra?.weatherApiKey || '';

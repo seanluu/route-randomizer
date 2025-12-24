@@ -1,9 +1,9 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
+import { DEFAULT_LATITUDE_DELTA, DEFAULT_LONGITUDE_DELTA, MAP_HEIGHT } from '@/backend/constants';
 import { Location, Route } from '@/backend/utils';
-import { MAP_HEIGHT, DEFAULT_LATITUDE_DELTA, DEFAULT_LONGITUDE_DELTA } from '@/backend/constants';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useRef } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 
 interface RouteMapProps {
   route?: Route | null;

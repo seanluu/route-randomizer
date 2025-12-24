@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { WeatherConditions, getWindSpeedText } from '@/backend/utils';
-import { card } from '@/styles/common';
 import { weatherService } from '@/backend/services/WeatherService';
+import { WeatherConditions, getWindSpeedText } from '@/backend/utils';
 import { usePreferences } from '@/context/AppContext';
+import { card } from '@/styles/common';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface WeatherCardProps {
   weather: WeatherConditions;

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -13,11 +13,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useCurrentLocation } from '@/hooks';
 import { weatherService } from '@/backend/services/WeatherService';
+import { useCurrentLocation } from '@/hooks';
 
-import { usePreferences } from '@/context/AppContext';
 import { UserPreferences, WeatherConditions } from '@/backend/utils';
+import { usePreferences } from '@/context/AppContext';
 
 import DistanceSelector from '@/components/DistanceSelector';
 import { RouteMap } from '@/components/RouteMap';
@@ -41,12 +41,10 @@ export default function HomeScreen() {
     temperatureUnits: 'celsius',
   };
 
-  // Fetch location and weather on mount
   useEffect(() => {
     fetchLocation();
   }, [fetchLocation]);
 
-  // Fetch weather when location is available
   useEffect(() => {
     if (currentLocation) {
       weatherService.getCurrentWeather(currentLocation).then(setWeather);
@@ -54,7 +52,6 @@ export default function HomeScreen() {
   }, [currentLocation]);
 
   const generateNewRoute = () => {
-    // Check if we have all required data
     if (!currentLocation || !userPreferences || !weather) {
       Alert.alert('Error', 'Unable to generate route. Please check your location and try again.');
       return;
@@ -82,7 +79,7 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>Discover new walking paths every day</Text>
         </View>
 
-        {/* Location permission request (shown when location is not available) */}
+        {/* request location when it's unavailable */}
         {!currentLocation && (
           <View style={styles.locationRequestContainer}>
             <LinearGradient
@@ -115,7 +112,7 @@ export default function HomeScreen() {
           units={units}
         />
 
-        {/* Map showing current location */}
+        {/* map showing current location */}
         {currentLocation && (
           <RouteMap
             currentLocation={currentLocation}
@@ -123,7 +120,7 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Generate a new walking route */}
+        {/* generate a new walking route */}
         <TouchableOpacity
           style={[styles.generateButton, !currentLocation && styles.generateButtonDisabled]}
           onPress={generateNewRoute}

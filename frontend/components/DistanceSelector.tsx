@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { MILES_TO_METERS, KM_TO_METERS } from '@/backend/constants';
+import { KM_TO_METERS, MILES_TO_METERS } from '@/backend/constants';
 import { card } from '@/styles/common';
+import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface DistanceSelectorProps {
   selectedDistance: number;

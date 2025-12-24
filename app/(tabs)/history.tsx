@@ -31,7 +31,6 @@ export default function RouteHistoryScreen() {
     }
   };
 
-  // Refresh routes whenever the tab comes into focus
   useFocusEffect(
     React.useCallback(() => {
       loadRoutes();

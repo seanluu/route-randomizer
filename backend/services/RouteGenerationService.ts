@@ -1,8 +1,8 @@
 import polyline from '@mapbox/polyline';
-import { Route, Location, RoutePoint, UserPreferences, WeatherConditions, RouteGenerationOptions } from '../utils';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { DIRECTIONS_BASE_URL, DIRECTIONS_TIMEOUT_MS } from '../constants';
+import { Location, Route, RouteGenerationOptions, RoutePoint, UserPreferences, WeatherConditions } from '../utils';
 
 const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || '';
 
